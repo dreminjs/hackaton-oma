@@ -1,0 +1,166 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum KitMode {
+  SOLO
+  PARENT
+}
+
+enum LessonStatus {
+  IN_PROGRESS
+  DONE
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id           String           @id @default(uuid())
+  name         String?
+  age          Int?
+  stars        Int              @default(0)
+  recoveryCode String?          @unique
+  createdAt    DateTime         @default(now())
+
+  activatedKits  KitCode[]
+  lessonProgress LessonProgress[]
+  userSkills     UserSkill[]
+  chatSessions   ChatSession[]
+}
+
+model Kit {
+  id          String      @id @default(uuid())
+  slug        String      @unique
+  title       String
+  description String
+  minAge      Int
+  mode        KitMode
+  tool        String
+  difficulty  Int
+  buyUrl      String
+  coverUrl    String?
+
+  codes        KitCode[]
+  lessons      Lesson[]
+  storeKits    StoreKit[]
+  chatSessions ChatSession[]
+}
+
+model KitCode {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  kitId       String
+  kit         Kit       @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activatedAt DateTime?
+}
+
+model Skill {
+  id    String @id @default(uuid())
+  title String
+
+  lessons    Lesson[]
+  userSkills UserSkill[]
+}
+
+model Lesson {
+  id      String  @id @default(uuid())
+  kitId   String
+  kit     Kit     @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  order   Int
+  title   String
+  skillId String?
+  skill   Skill?  @relation(fields: [skillId], references: [id], onDelete: SetNull)
+
+  steps        LessonStep[]
+  progress     LessonProgress[]
+  chatSessions ChatSession[]
+}
+
+model LessonStep {
+  id       String  @id @default(uuid())
+  lessonId String
+  lesson   Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  order    Int
+  text     String
+  imageUrl String?
+  videoUrl String?
+}
+
+model LessonProgress {
+  id               String       @id @default(uuid())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId         String
+  lesson           Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  status           LessonStatus
+  maxStepReached   Int          @default(0)
+  adultConfirmedAt DateTime?
+  startedAt        DateTime     @default(now())
+  completedAt      DateTime?
+
+  @@unique([userId, lessonId])
+}
+
+model UserSkill {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillId  String
+  skill    Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
+
+  @@unique([userId, skillId])
+}
+
+model Store {
+  id      String @id @default(uuid())
+  name    String
+  address String
+  lat     Float
+  lng     Float
+  hours   String
+
+  kits StoreKit[]
+}
+
+model StoreKit {
+  id      String  @id @default(uuid())
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  kitId   String
+  kit     Kit     @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  inStock Boolean @default(true)
+
+  @@unique([storeId, kitId])
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kitId     String?
+  kit       Kit?          @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  lessonId  String?
+  lesson    Lesson?       @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      ChatRole
+  content   String
+  createdAt DateTime    @default(now())
+}
